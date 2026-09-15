@@ -19,18 +19,18 @@ MultiQC gives every sample its own row.
 When one subject yields several samples that are measured by different methods, say a tumour and a normal, or two tissues and a paired-genotype check, the General Statistics table ends up with a block of half-empty rows per subject.
 MultiQC's own [sample grouping](https://docs.seqera.io/multiqc/reports/customisation#sample-grouping) only fills the group's row for the handful of modules that know how to merge their metrics.
 
-This plugin runs after every module has reported and rebuilds the table:
+This plugin runs after every module has reported and rebuilds the General Statistics table:
 
 1. Rows for one group fold into a single row, and every folded column is prefixed by which method it came from.
 2. The original rows stay beneath the group row, so they still can be viewed.
-3. Rows for a level that does not belong in the table, such as per-library read QC, move out into their own table under General Statistics with whatever grouping they already had.
+3. Rows for a level that do not belong in the table, such as per-library read QC, move out into their own table under General Statistics with whatever grouping they already had.
 4. Hover text, color scales, formats and hidden-by-default state carry over from the module that produced each column.
 
 ## Usage
 
 Add a `sample_pivot` block to any MultiQC config, for example with `--config my_config.yml`.
 
-So, with these sample names:
+So, with these sample and library filename prefixes for a patient:
 
 ```text
 101.subject
@@ -41,7 +41,7 @@ So, with these sample names:
 101.tissueA.library.L2
 ```
 
-This configuration produces one row named `101` carrying `Concordance`, `TissueA Median`, `TissueB Median`, `TissueB (filtered) % Aligned` and so on, and moves the library rows into a separate table:
+The following configuration produces one row named `101` carrying `Concordance`, `TissueA Median`, `TissueB Median`, `TissueB (filtered) % Aligned` and so on, and moves any per-library rows into a separate table:
 
 ```yaml
 sample_pivot:
@@ -56,7 +56,7 @@ sample_pivot:
       table: Library statistics
   label_order: [tissueA, tissueB, tissueB (filtered)]
   tables:
-    Library statistics:
+    Library Statistics:
       description: Per-library read QC; read pairs nest under their library.
 ```
 
