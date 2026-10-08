@@ -127,6 +127,60 @@ def test_labelled_rows_fold_into_one_row_per_group() -> None:
     assert new_headers[ColumnKey("median")] == headers[coverage][ColumnKey("median")]
 
 
+def test_keep_rows_false_drops_only_the_rows_beneath_the_group_row() -> None:
+    coverage = SectionKey("coverage")
+    rows = {coverage: section(row("101.tissueA", median=743), row("101.tissueB", median=419))}
+    headers = {coverage: {ColumnKey("median"): header("Median", suffix="X")}}
+    match = r"\.(?P<analyte>tissueA|tissueB)$"
+    kept = SETTINGS.model_copy(update={"levels": [Level(match=match, label="{analyte}")]})
+    dropped = SETTINGS.model_copy(
+        update={"levels": [Level(match=match, label="{analyte}", keep_rows=False)]}
+    )
+
+    with_rows = pivot(rows, headers, kept)
+    without_rows = pivot(rows, headers, dropped)
+
+    group_row = row("101", median__tissuea=743, median__tissueb=419)
+    assert with_rows.rows[coverage] == {
+        SampleGroup("101"): [
+            group_row,
+            row("101.tissueA", median__tissuea=743),
+            row("101.tissueB", median__tissueb=419),
+        ]
+    }
+    assert without_rows.rows[coverage] == {SampleGroup("101"): [group_row]}
+    assert without_rows.headers == with_rows.headers
+
+
+def test_keep_rows_applies_per_level() -> None:
+    settings = SETTINGS.model_copy(
+        update={
+            "levels": [
+                Level(match=r"\.(?P<analyte>tissueA|tissueB)$", label="{analyte}", keep_rows=False),
+                Level(match=r"\.(?P<analyte>tissueB) \(filtered\)$", label="{analyte} (filtered)"),
+            ]
+        }
+    )
+    alignment = SectionKey("alignment")
+    rows = {
+        alignment: section(
+            row("101.tissueB", aligned=36.5), row("101.tissueB (filtered)", aligned=35.4)
+        )
+    }
+    headers = {alignment: {ColumnKey("aligned"): header("% Aligned")}}
+
+    result = pivot(rows, headers, settings)
+
+    assert classify("101.tissueB", settings) == Folded("101", "tissueB", keep_row=False)
+    assert classify("101.tissueB (filtered)", settings) == Folded("101", "tissueB (filtered)")
+    assert result.rows[alignment] == {
+        SampleGroup("101"): [
+            row("101", aligned__tissueb=36.5, aligned__tissueb_filtered=35.4),
+            row("101.tissueB (filtered)", aligned__tissueb_filtered=35.4),
+        ]
+    }
+
+
 def test_unlabelled_rows_become_the_group_row() -> None:
     concordance = SectionKey("concordance")
     rows = {concordance: section(row("101.subject", concordance=99.7, undeclared="x"))}

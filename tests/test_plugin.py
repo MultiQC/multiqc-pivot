@@ -73,5 +73,40 @@ def test_report(tmp_path: Path) -> None:
     assert html.count("Per-library read QC.") == 1
 
 
+def test_report_without_labelled_rows(tmp_path: Path) -> None:
+    multiqc.reset()  # type: ignore[no-untyped-call]
+    multiqc.parse_logs(
+        str(DATA / "report"), config_files=[str(DATA / "multiqc_config_keep_rows.yml")]
+    )
+
+    samples = {
+        str(row.sample)
+        for section in report.general_stats_data.values()
+        for rows in section.values()
+        for row in rows
+    }
+    assert samples == {"101", "102", "101.tissueB (filtered)", "102.tissueB (filtered)"}
+    titles = {
+        str(column.get("title"))
+        for section in report.general_stats_headers.values()
+        for column in section.values()
+    }
+    assert {
+        "Concordance",
+        "TissueA Median",
+        "TissueB Median",
+        "TissueB (filtered) % Aligned",
+    } <= titles
+
+    multiqc.write_report(output_dir=str(tmp_path), filename="report.html", force=True)
+    html = (tmp_path / "report.html").read_text()
+    general_stats = re.search(r'<table id="general_stats_table_table".*?</table>', html, re.S)
+    assert general_stats is not None
+    assert general_stats.group(0).count('class="expandable-row-primary"') == 2
+    assert general_stats.group(0).count('class="expandable-row-secondary') == 2
+    assert 'data-original-sn="101.tissueA"' not in general_stats.group(0)
+    assert "TissueA Median" in general_stats.group(0)
+
+
 def test_table_module_is_none_for_an_empty_table() -> None:
     assert table_module("Empty", TableSettings(), Table()) is None
