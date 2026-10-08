@@ -53,6 +53,23 @@ def test_label_and_table_are_exclusive() -> None:
         Level(match=r"\.x$", label="x", table="Table")
 
 
+def test_keep_rows_defaults_to_true() -> None:
+    assert Level(match=r"\.subject$").keep_rows
+    level = Level.model_validate({
+        "match": r"\.(?P<analyte>x)$",
+        "label": "{analyte}",
+        "keep_rows": False,
+    })
+    assert not level.keep_rows
+
+
+def test_keep_rows_false_needs_a_label() -> None:
+    with pytest.raises(ValidationError, match="keep_rows to false only with a label"):
+        Level(match=r"\.subject$", keep_rows=False)
+    with pytest.raises(ValidationError, match="keep_rows to false only with a label"):
+        Level(match=r"\.library\.", table="Library statistics", keep_rows=False)
+
+
 def test_label_must_use_captures_of_match() -> None:
     with pytest.raises(ValidationError, match="lacks"):
         Level(match=r"\.(?P<analyte>x)$", label="{tissue}")

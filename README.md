@@ -22,7 +22,7 @@ MultiQC's own [sample grouping](https://docs.seqera.io/multiqc/reports/customisa
 This plugin runs after every module has reported and rebuilds the General Statistics table:
 
 1. Rows for one group fold into a single row, and every folded column is prefixed by which method it came from.
-2. The original rows stay beneath the group row, so they still can be viewed.
+2. The original rows stay beneath the group row, so they still can be viewed, unless a level asks for them to be dropped.
 3. Rows for a level that do not belong in the table, such as per-library read QC, move out into their own table under General Statistics with whatever grouping they already had.
 4. Hover text, color scales, formats and hidden-by-default state carry over from the module that produced each column.
 
@@ -71,7 +71,8 @@ And your report will look like:
 | `group` | A regular expression searched in every matched sample name. Its `(?P<group>...)` capture names the folded row. Required. |
 | `levels` | An ordered list; the first level whose `match` is found in a sample name wins. Required. |
 | `levels[].match` | A regular expression searched in the sample name. Named captures are available to `label`. |
-| `levels[].label` | A format string built from the captures of `match`. Columns of matching rows are renamed with it and folded onto the group row; the row itself stays beneath. Omit it, and omit `table`, to fold the row's columns onto the group row unchanged. |
+| `levels[].label` | A format string built from the captures of `match`. Columns of matching rows are renamed with it and folded onto the group row; the row itself stays beneath unless `keep_rows` is `false`. Omit it, and omit `table`, to fold the row's columns onto the group row unchanged. |
+| `levels[].keep_rows` | Whether rows of a labelled level stay beneath the group row. Set it to `false` to keep only the folded columns on the group row. Allowed only alongside `label`. Default `true`. |
 | `levels[].table` | The name of a table that receives matching rows instead of General Statistics. Rows keep their grouping, so paired reads stay nested under their library. Tables sit directly under General Statistics in the order their levels are listed. |
 | `column_title` | How a pivoted column is titled. `{label}` is the label as written, `{Label}` has its first letter upper-cased, `{title}` is the module's title. Default `{Label} {title}`. |
 | `label_order` | Labels in the order their column blocks should appear. Labels not listed follow in order of first appearance. |
@@ -81,6 +82,22 @@ And your report will look like:
 > A sample that matches no level is left where it was. 
 > A sample that matches a level but not `group` is left alone as well, with a warning in the log.
 > Columns that a module did not declare a header for are dropped from folded rows, as MultiQC would have dropped them anyway.
+
+### Dropping Labelled Rows
+
+When the group row already says everything you need, set `keep_rows: false` on a labelled level.
+Its columns still fold onto the group row, renamed and titled as before, but the original rows no longer sit beneath it.
+They are removed from General Statistics only, so each module's own section still shows them.
+
+```yaml
+sample_pivot:
+  group: '^(?P<group>[^. ]+)\.'
+  levels:
+    - match: '\.subject$'
+    - match: '\.(?P<analyte>tissueA|tissueB)$'
+      label: '{analyte}'
+      keep_rows: false
+```
 
 ### Limitations
 

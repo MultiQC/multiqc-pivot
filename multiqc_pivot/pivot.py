@@ -68,10 +68,15 @@ class Moved:
 
 @dataclass(frozen=True)
 class Folded:
-    """The row belongs on a group's row, under a label unless it is the group's own row."""
+    """
+    The row belongs on a group's row, under a label unless it is the group's own row.
+
+    A labelled row also stays beneath the group row unless `keep_row` is false.
+    """
 
     group: str
     label: str | None = None
+    keep_row: bool = True
 
 
 Route = Moved | Folded
@@ -97,7 +102,7 @@ def classify(name: str, settings: SamplePivotConfig) -> Route | None:
             )
             return None
         label = level.label.format(**match.groupdict()) if level.label is not None else None
-        return Folded(group.group("group"), label)
+        return Folded(group.group("group"), label, level.keep_rows)
     return None
 
 
@@ -175,11 +180,12 @@ class SectionPivot:
             if key in self.headers:
                 _fold(target, key, value, group)
 
-    def fold_labelled(self, group: str, label: str, row: InputRow) -> None:
+    def fold_labelled(self, group: str, label: str, row: InputRow, keep_row: bool = True) -> None:
         """
         Rename a row's declared columns after the label and put them onto the group row.
 
-        The row itself stays beneath the group row, carrying the same renamed columns.
+        The row itself stays beneath the group row, carrying the same renamed columns, unless
+        `keep_row` is false.
         """
         target = self._group_rows.setdefault(group, {})
         renamed: RowData = {}
@@ -193,7 +199,8 @@ class SectionPivot:
                 )
             renamed[new_key] = value
             _fold(target, new_key, value, group)
-        self._sub_rows.setdefault(group, []).append(InputRow(sample=row.sample, data=renamed))
+        if keep_row:
+            self._sub_rows.setdefault(group, []).append(InputRow(sample=row.sample, data=renamed))
 
     def finish(self) -> SectionRows:
         """The rebuilt rows, each group row first with its folded rows beneath."""
@@ -209,11 +216,12 @@ def pivot(rows: Rows, headers: Headers, settings: SamplePivotConfig) -> PivotRes
     Rebuild General Statistics with one row per group.
 
     Rows that match a labelled level have their declared columns renamed after the label and copied
-    onto the group's row; the original rows stay beneath it so the group can still be expanded.
-    Rows that match an unlabelled level are folded onto the group's row as they are. Rows that match
-    a level with a table are moved into that table with their grouping intact; the tables come back
-    in the order their levels are listed, without the ones that received no rows. Rows that match no
-    level, and columns a module did not declare a header for, are left alone.
+    onto the group's row; the original rows stay beneath it so the group can still be expanded,
+    unless the level sets `keep_rows` to false. Rows that match an unlabelled level are folded onto
+    the group's row as they are. Rows that match a level with a table are moved into that table with
+    their grouping intact; the tables come back in the order their levels are listed, without the
+    ones that received no rows. Rows that match no level, and columns a module did not declare a
+    header for, are left alone.
     """
     placement = Placement(settings.label_order)
     out_rows: Rows = {}
@@ -232,7 +240,7 @@ def pivot(rows: Rows, headers: Headers, settings: SamplePivotConfig) -> PivotRes
                 elif route.label is None:
                     pivoted.fold(route.group, row)
                 else:
-                    pivoted.fold_labelled(route.group, route.label, row)
+                    pivoted.fold_labelled(route.group, route.label, row, route.keep_row)
         out_rows[section] = pivoted.finish()
         out_headers[section] = pivoted.new_headers
     return PivotResult(out_rows, out_headers, {n: t for n, t in tables.items() if t.rows})

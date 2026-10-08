@@ -28,8 +28,9 @@ class Level(BaseModel):
 
     A level with neither `label` nor `table` folds its columns onto the group row as they are. A
     level with a `label` renames its columns after the label, folds them onto the group row and
-    keeps the original row underneath. A level with a `table` moves its rows out of General
-    Statistics into a table of that name, keeping whatever grouping they already had.
+    keeps the original row underneath, unless `keep_rows` is false, which drops the original row
+    from General Statistics. A level with a `table` moves its rows out of General Statistics into a
+    table of that name, keeping whatever grouping they already had.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
@@ -37,6 +38,7 @@ class Level(BaseModel):
     match: str
     label: str | None = None
     table: str | None = None
+    keep_rows: bool = True
 
     @field_validator("match")
     @classmethod
@@ -54,6 +56,12 @@ class Level(BaseModel):
             except (KeyError, IndexError) as exc:
                 message = f"label {self.label!r} uses a capture that match {self.match!r} lacks"
                 raise ValueError(f"{message} ({exc})") from exc
+        return self
+
+    @model_validator(mode="after")
+    def _keep_rows_needs_label(self) -> Level:
+        if not self.keep_rows and self.label is None:
+            raise ValueError("a level may set keep_rows to false only with a label")
         return self
 
     @property
